@@ -1,2 +1,2 @@
-# motherlode
- 2D excavation game inspired by the flash game Motherload
+# Motherlode
+A 2D excavation game for the [AdaFruit PyGamer](https://www.adafruit.com/product/4242).

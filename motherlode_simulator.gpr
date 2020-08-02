@@ -1,0 +1,25 @@
+with "pygamer_simulator.gpr";
+with "hal.gpr";
+with "virtapu.gpr";
+
+project Motherlode_Simulator extends "geste.gpr" is
+
+   for Source_Dirs use ("src/**");
+   for Object_Dir use "obj_simulator";
+   for Languages use ("Ada", "C");
+
+   for Main use ("main.adb");
+
+   package Compiler is
+      for Switches ("Ada") use ("-g");
+   end Compiler;
+
+   package Linker is
+      for Switches ("Ada") use ("-g");
+   end Linker;
+
+   package Builder is
+      for Executable ("main.adb") use "motherlode_sim";
+   end Builder;
+
+end Motherlode_Simulator;

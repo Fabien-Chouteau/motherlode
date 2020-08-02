@@ -1,0 +1,9 @@
+# Object file
+*.o
+
+# Ada Library Information
+*.ali
+
+alire/
+obj_simulator/
+obj_target/
