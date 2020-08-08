@@ -7,7 +7,11 @@ package HUD is
 
    procedure Draw
      (FB : in out HAL.UInt16_Array;
-      Money, Fuel, Fuel_Max, Cargo, Cargo_Max, Hull, Hull_Max : Natural);
+      Money,
+      Fuel, Fuel_Max,
+      Cargo, Cargo_Max,
+      Hull, Hull_Max : Natural;
+      Depth : Integer);
 
    function RGB565 (R, G, B : HAL.UInt8) return HAL.UInt16;
 end HUD;

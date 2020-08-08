@@ -93,7 +93,11 @@ package body HUD is
 
    procedure Draw
      (FB : in out HAL.UInt16_Array;
-      Money, Fuel, Fuel_Max, Cargo, Cargo_Max, Hull, Hull_Max : Natural)
+      Money,
+      Fuel, Fuel_Max,
+      Cargo, Cargo_Max,
+      Hull, Hull_Max : Natural;
+      Depth : Integer)
    is
       Fuel_Color : constant UInt16 := RGB565 (204, 102, 0);
       Cargo_Color : constant UInt16 := RGB565 (0, 102, 204);
@@ -107,6 +111,7 @@ package body HUD is
       if Fuel = 0 then
          Draw_String (FB, Font8x8, "NO FUEL", 52, 100, Fuel_Color);
       end if;
+
       declare
          Str : String := Money'Img;
       begin
@@ -115,6 +120,15 @@ package body HUD is
                       Screen.Width - Str'Length * 8,
                       1,
                       Money_Color);
+      end;
+
+      declare
+         Str : constant String := Depth'Img;
+      begin
+         Draw_String (FB, Font8x8, Str,
+                      Screen.Width - Str'Length * 8,
+                      Screen.Height - 9,
+                      UInt16'Last);
       end;
    end Draw;
 

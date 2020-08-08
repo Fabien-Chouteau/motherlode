@@ -3,7 +3,6 @@
 
 with GESTE;
 with GESTE.Maths_Types; use GESTE.Maths_Types;
-with GESTE.Physics;
 
 with World; use World;
 with HUD;
@@ -402,7 +401,7 @@ package body Player is
       end loop;
 
       --  Consume Fuel
-      if Going_Right or else Going_Left or else Going_Up or else Going_Down then
+      if Going_Right or else Going_Left or else Going_Up then
          P.Fuel := P.Fuel - Fuel_Per_Step;
       end if;
 
@@ -447,7 +446,8 @@ package body Player is
                 P.Cargo_Sum,
                 P.Cargo_Max,
                 P.Hull,
-                P.Hull_Max);
+                P.Hull_Max,
+                (-Integer (P.Position.Y) / Cell_Size) + 2);
    end Draw;
 
    -------------

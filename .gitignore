@@ -7,3 +7,5 @@
 alire/
 obj_simulator/
 obj_target/
+uf2conv.py
+*.uf2
