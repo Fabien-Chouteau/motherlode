@@ -9,13 +9,11 @@ with PyGamer.Audio; use PyGamer.Audio;
 
 package body Sound is
 
-   C_32nd     : constant Command := (Wait_Ticks, 0);
    C_16th     : constant Command := (Wait_Ticks, 1);
    C_8th     : constant Command := (Wait_Ticks, C_16th.Ticks * 2);
    C_Quarter : constant Command := (Wait_Ticks, C_8th.Ticks * 2);
    C_Half    : constant Command := (Wait_Ticks, C_Quarter.Ticks * 2);
-   C_Whole   : constant Command := (Wait_Ticks, C_Half.Ticks * 2);
-   C_Double  : constant Command := (Wait_Ticks, C_Whole.Ticks * 2);
+   --  C_Whole   : constant Command := (Wait_Ticks, C_Half.Ticks * 2);
 
    Coin_Seq : aliased constant Command_Array :=
      ((Set_Decay, 10),
@@ -29,25 +27,12 @@ package body Sound is
       Off
      );
 
-   Game_Over_Seq : aliased constant Command_Array :=
-     ((Set_Decay, 20),
-      (Set_Mode, Pulse),
-      (Set_Width, 25),
-      Fs3, C_Quarter, Off,
-      C_Half,
-      Cs3, C_8th, Off, C_8th,
-      C_Quarter,
-      C3, Off, C_8th,
-      Cs3, Off, C_8th,
-      C3, C_Half, Off
-     );
-
    Gun_Seq : aliased constant Command_Array :=
      ((Set_Mode, Noise_1),
       (Set_Decay, 15),
       (Set_Sweep, Up, 13, 0),
       (Set_Mode, Noise_1),
-      (Note_On, 2000.0),
+      (Note_On, 200.0),
       Off
      );
 
@@ -140,61 +125,12 @@ package body Sound is
    Bass_Seq : aliased constant Command_Array :=
      Bass_1 & Bass_2 & Bass_1 & Bass_3;
 
-   Lead_1 : constant Command_Array :=
-     C4 & Off &
-     C_Whole & C_Whole & C_Half &
-     Ds4 & Off &
-     C_Whole &
-     G4 &  Off &
-     C_Whole & C_Whole & C_Whole &
-     Fs4 & Off &
-     C_Half &
-     Gs4 & Off &
-     C_Half &
-     Ds4 & Off &
-     C_Half;
-
-   Lead_2 : constant Command_Array :=
-     C4 & Off &
-     C_Whole & C_Whole & C_Half &
-     Ds4 & Off &
-     C_Whole &
-     Gs3 &  Off &
-     C_Whole & C_Whole & C_Whole &
-     G3 & Off &
-     C_Half &
-     As3 & Off &
-     C_Half &
-     B3 & Off &
-     C_Half;
-
-   Lead_3 : constant Command_Array :=
-     C4 & Off &
-     C_Whole & C_Whole & C_Half &
-     G4 & Off &
-     C_Half &
-     As4 & Off &
-     C_Half &
-     Fs4 & Off &
-     C_Whole & C_Whole & C_Whole &
-     Gs4 & Off &
-     C_Half &
-     G4 & Off &
-     C_Half &
-     Ds4 & Off &
-     C_Half;
-
-   Lead_Seq : aliased constant Command_Array :=
-     Lead_1 & Lead_2 & Lead_3 & Lead_2;
-
    Sample_Rate : constant Sample_Rate_Kind := SR_22050;
-   APU : VirtAPU.Instance (5, 22_050);
+   APU : VirtAPU.Instance (3, 22_050);
 
    Player_FX : constant VirtAPU.Channel_ID := 1;
-   World_FX  : constant VirtAPU.Channel_ID := 2;
-   Drums     : constant VirtAPU.Channel_ID := 3;
-   Bass      : constant VirtAPU.Channel_ID := 4;
-   Lead      : constant VirtAPU.Channel_ID := 5;
+   Drums     : constant VirtAPU.Channel_ID := 2;
+   Bass      : constant VirtAPU.Channel_ID := 3;
 
    procedure Next_Samples is new VirtAPU.Next_Samples_UInt
      (Interfaces.Unsigned_16, PyGamer.Audio.Data_Array);
@@ -226,7 +162,8 @@ package body Sound is
 
    procedure Play_Coin is
    begin
-      APU.Run (World_FX, Coin_Seq'Access);
+      APU.Set_Volume (Player_FX, 30);
+      APU.Run (Player_FX, Coin_Seq'Access);
    end Play_Coin;
 
    ----------------
@@ -235,51 +172,41 @@ package body Sound is
 
    procedure Play_Drill is
    begin
+      APU.Set_Volume (Player_FX, 60);
       APU.Run (Player_FX, Gun_Seq'Access);
    end Play_Drill;
 
-   -------------------
-   -- Play_Gameover --
-   -------------------
+   ----------------
+   -- Play_Music --
+   ----------------
 
-   procedure Play_Gameover is
-   begin
-      APU.Set_Volume (Drums, 0);
-      APU.Note_Off (Bass);
-      APU.Run (Bass, Empty_Seq, Looping => False);
-
-      APU.Set_Volume (Bass, 0);
-      APU.Note_Off (Bass);
-      APU.Run (Bass, Empty_Seq, Looping => False);
-
-      APU.Set_Volume (Lead, 50);
-      APU.Run (Lead, Game_Over_Seq'Access, Looping => False);
-   end Play_Gameover;
-
-   -------------------
-   -- Play_Gameplay --
-   -------------------
-
-   procedure Play_Gameplay is
+   procedure Play_Music is
    begin
       APU.Run (Drums, Drums_Seq'Access, Looping => True);
-      APU.Set_Volume (Drums, 50);
+      APU.Set_Volume (Drums, 10);
 
       APU.Set_Mode (Bass, Triangle);
       APU.Set_Decay (Bass, 7);
-      APU.Set_Volume (Bass, 50);
+      APU.Set_Volume (Bass, 90);
       APU.Run (Bass, Bass_Seq'Access, Looping => True);
+   end Play_Music;
 
-      APU.Set_Mode (Lead, Pulse);
-      APU.Set_Decay (Lead, 40);
-      APU.Set_Width (Lead, 25);
-      APU.Set_Volume (Lead, 50);
-      APU.Run (Lead, Lead_Seq'Access, Looping => True);
-   end Play_Gameplay;
+   ----------------
+   -- Stop_Music --
+   ----------------
+
+   procedure Stop_Music is
+   begin
+      APU.Run (Drums, VirtAPU.Empty_Seq);
+      APU.Set_Volume (Drums, 0);
+      APU.Note_Off (Drums);
+      APU.Run (Bass, VirtAPU.Empty_Seq);
+      APU.Set_Volume (Bass, 0);
+      APU.Note_Off (Bass);
+   end Stop_Music;
 
 begin
    PyGamer.Audio.Set_Callback (Audio_Callback'Access, Sample_Rate);
 
    APU.Set_Rhythm (120, 30);
-
 end Sound;

@@ -8,6 +8,7 @@ package Sound is
    procedure Play_Coin;
    procedure Play_Drill;
 
-   procedure Play_Gameover;
-   procedure Play_Gameplay;
+   procedure Play_Music;
+   procedure Stop_Music;
+
 end Sound;

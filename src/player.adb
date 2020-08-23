@@ -4,15 +4,10 @@
 with GESTE;
 with GESTE.Maths_Types; use GESTE.Maths_Types;
 
-with World; use World;
 with HUD;
 with Sound;
 
 package body Player is
-
-   Empty_Mass    : constant Value := Value (90.0);
-   Fuel_Per_Step : constant := 0.01;
-
 
    P : aliased Player_Type;
 
@@ -41,13 +36,13 @@ package body Player is
 
    --  Bounding Box points
    BB_Top : constant Collision_Points :=
-     ((-5, -6), (5, -6));
+     ((-3, -4), (3, -4));
    BB_Bottom : constant Collision_Points :=
-     ((-5, 6), (5, 6));
+     ((-3, 5), (3, 5));
    BB_Left : constant Collision_Points :=
-     ((-7, 6), (-7, -6));
+     ((-5, 5), (-5, -2));
    BB_Right : constant Collision_Points :=
-     ((7, 6), (7, -6));
+     ((5, 5), (5, -2));
 
 
    --  Drill points
@@ -86,10 +81,13 @@ package body Player is
 
    procedure Spawn is
    begin
-      P.Alive := True;
-      P.Set_Mass (Empty_Mass);
+      P.Set_Mass (Parameters.Empty_Mass);
       P.Set_Speed ((0.0, 0.0));
-      Move ((50, 20));
+      P.Money := 0;
+      P.Fuel := Parameters.Start_Fuel;
+      P.Equip_Level := (others => 1);
+
+      Move ((Parameters.Spawn_X, Parameters.Spawn_Y));
    end Spawn;
 
    ----------
@@ -99,6 +97,7 @@ package body Player is
    procedure Move (Pt : GESTE.Pix_Point) is
    begin
       P.Set_Position (GESTE.Maths_Types.Point'(Value (Pt.X), Value (Pt.Y)));
+      P.Set_Speed ((0.0, 0.0));
    end Move;
 
    --------------
@@ -109,29 +108,79 @@ package body Player is
    is ((Integer (P.Position.X), Integer (P.Position.Y)));
 
    --------------
-   -- Is_Alive --
+   -- Quantity --
    --------------
 
-   function Is_Alive return Boolean
-   is (P.Alive);
+   function Quantity (Kind : World.Valuable_Cell) return Natural
+   is (P.Cargo (Kind));
+
+   ----------
+   -- Drop --
+   ----------
+
+   procedure Drop (Kind : World.Valuable_Cell) is
+      Cnt : Natural renames P.Cargo (Kind);
+   begin
+      if Cnt > 0 then
+         Cnt := Cnt - 1;
+         P.Cargo_Sum := P.Cargo_Sum - 1;
+
+         P.Set_Mass (P.Mass - Value (Parameters.Weight (Kind)));
+      end if;
+   end Drop;
+
+   -----------
+   -- Level --
+   -----------
+
+   function Level (Kind : Parameters.Equipment)
+                   return Parameters.Equipment_Level
+   is (P.Equip_Level (Kind));
+
+   -------------
+   -- Upgrade --
+   -------------
+
+   procedure Upgrade (Kind : Parameters.Equipment) is
+      use Parameters;
+   begin
+      if P.Equip_Level (Kind) /= Equipment_Level'Last then
+         declare
+            Next_Lvl : constant Equipment_Level := P.Equip_Level (Kind) + 1;
+            Cost : constant Natural := Parameters.Price (Kind, Next_Lvl);
+         begin
+            if Cost <= P.Money then
+               P.Money := P.Money - Cost;
+               P.Equip_Level (Kind) := Next_Lvl;
+               P.Cash_In := P.Cash_In - Cost;
+               P.Cash_In_TTL := 30 * 1;
+            end if;
+         end;
+      end if;
+   end Upgrade;
+
+   -----------
+   -- Money --
+   -----------
+
+   function Money return Natural
+   is (P.Money);
 
    ------------------
    -- Put_In_Cargo --
    ------------------
 
-   procedure Put_In_Cargo (This : in out Player_Type; Kind : Valuable_Cell) is
+   procedure Put_In_Cargo (This : in out Player_Type;
+                           Kind : World.Valuable_Cell)
+   is
+      use Parameters;
    begin
 
-      if P.Cargo_Sum < P.Cargo_Max then
-         Sound.Play_Coin;
+      if P.Cargo_Sum <  Cargo_Capacity (This.Equip_Level (Cargo)) then
          P.Cargo (Kind) := P.Cargo (Kind) + 1;
          P.Cargo_Sum := P.Cargo_Sum + 1;
 
-         P.Set_Mass (P.Mass + (case Kind is
-                        when Coal    => 10.0,
-                        when Iron    => 20.0,
-                        when Gold    => 40.0,
-                        when Diamond => 60.0));
+         P.Set_Mass (P.Mass + GESTE.Maths_Types.Value (Weight (Kind)));
       end if;
    end Put_In_Cargo;
 
@@ -141,30 +190,76 @@ package body Player is
 
    procedure Empty_Cargo (This : in out Player_Type) is
    begin
-      for Kind in Valuable_Cell loop
-         P.Money := P.Money + P.Cargo (Kind) * (case Kind is
-                                                   when Coal    => 30,
-                                                   when Iron    => 100,
-                                                   when Gold    => 250,
-                                                   when Diamond => 750);
+      if This.Cash_In_TTL /= 0 then
+         --  Do not empty cargo when still showing previous cash operation
+         return;
+      end if;
+
+      This.Cash_In := 0;
+      for Kind in World.Valuable_Cell loop
+         P.Cash_In := P.Cash_In + P.Cargo (Kind) * Parameters.Value (Kind);
          P.Cargo (Kind) := 0;
       end loop;
+
+      if This.Cash_In = 0 then
+         return;
+      end if;
+
+      P.Money := P.Money + P.Cash_In;
+
+      --  How many frames the cash in text will be displayed
+      P.Cash_In_TTL := 30  * 1;
+
       P.Cargo_Sum := 0;
-      P.Set_Mass (Empty_Mass);
+      P.Set_Mass (Parameters.Empty_Mass);
+
+      Sound.Play_Coin;
    end Empty_Cargo;
+
+   ------------
+   -- Refuel --
+   ------------
+
+   procedure Refuel (This : in out Player_Type) is
+
+      use Parameters;
+
+      Tank_Capa : constant Float :=
+        Float (Tank_Capacity (This.Equip_Level (Tank)));
+
+      Amount : constant Float :=
+        Float'Min (Tank_Capa - P.Fuel,
+                   Float (P.Money) / Parameters.Fuel_Price);
+      Cost   : constant Natural := Natural (Amount * Parameters.Fuel_Price);
+   begin
+
+      if This.Cash_In_TTL /= 0 or else Amount = 0.0 then
+         --  Do not refuel when still showing previous cash operation
+         return;
+      end if;
+
+      if Cost <= This.Money then
+         P.Fuel := P.Fuel + Amount;
+         P.Money := P.Money - Cost;
+         P.Cash_In := -Cost;
+         P.Cash_In_TTL := 30 * 1;
+      end if;
+   end Refuel;
 
    ---------------
    -- Try_Drill --
    ---------------
 
    procedure Try_Drill is
+      use World;
+      use Parameters;
+
       PX : constant Integer := Integer (P.Position.X);
       PY : constant Integer := Integer (P.Position.Y);
       CX :          Integer := PX / Cell_Size;
       CY :          Integer := PY / Cell_Size;
       Drill : Boolean := False;
    begin
-      --  FIXME: drilling proto
       if Using_Drill and then Grounded then
          if Going_Down and Collides (Drill_Bottom) then
             CY := CY + 1;
@@ -180,17 +275,22 @@ package body Player is
 
          if Drill
            and then
-            CX in 0 .. Ground_Width - 1
+            CX in 0 .. World.Ground_Width - 1
            and then
-            CY in 0 .. Ground_Depth - 1
+            CY in 0 .. World.Ground_Depth - 1
          then
             declare
                Kind : constant Cell_Kind := Ground (CX + CY * Ground_Width);
             begin
-               if Kind /= Rock then
+               if (Kind /= Gold or else P.Equip_Level (Parameters.Drill) > 1)
+                 and then
+                   (Kind /= Diamond or else P.Equip_Level (Parameters.Drill) > 2)
+                 and then
+                   (Kind /= Rock or else P.Equip_Level (Parameters.Drill) = 7)
+               then
 
                   Sound.Play_Drill;
-                  if Kind in Valuable_Cell then
+                  if Kind in World.Valuable_Cell then
                      P.Put_In_Cargo (Kind);
                   end if;
 
@@ -205,10 +305,12 @@ package body Player is
                                           when Iron    => 30,
                                           when Gold    => 40,
                                           when Diamond => 50,
+                                          when Rock    => 80,
                                           when others  => raise Program_Error);
 
                   --  Faster drilling with a better drill...
-                  Drill_Anim.Steps := Drill_Anim.Steps / P.Drill_Lvl;
+                  Drill_Anim.Steps :=
+                    Drill_Anim.Steps / Natural (P.Equip_Level (Parameters.Drill));
 
                   Drill_Anim.Rem_Steps := Drill_Anim.Steps;
                end if;
@@ -222,6 +324,8 @@ package body Player is
    -----------------------
 
    procedure Update_Drill_Anim is
+      use World;
+
       D : Drill_Anim_Rec renames Drill_Anim;
       Target_PX : constant Natural := D.Target_CX * Cell_Size + Cell_Size / 2;
       Target_PY : constant Natural := D.Target_CY * Cell_Size + Cell_Size / 2;
@@ -237,11 +341,12 @@ package body Player is
          Using_Drill := False;
 
          --  Kill speed
-         P.Set_Speed ((Value (0.0), Value (0.0)));
+         P.Set_Speed ((GESTE.Maths_Types.Value (0.0),
+                      GESTE.Maths_Types.Value (0.0)));
       else
 
          --  Consume Fuel
-         P.Fuel := P.Fuel - Fuel_Per_Step;
+         P.Fuel := P.Fuel - Parameters.Fuel_Per_Step;
 
          declare
             Percent : constant Float :=
@@ -311,12 +416,14 @@ package body Player is
 
       --  Gavity
       if not Grounded then
-         P.Apply_Gravity (Value (-500.0));
+         P.Apply_Gravity (-Parameters.Gravity);
       end if;
 
       if Going_Up then
          --  Thrust
-         P.Apply_Force ((0.0, -140_000.0));
+         P.Apply_Force ((0.0,
+                        -Value (Parameters.Engine_Thrust
+                          (P.Equip_Level (Parameters.Engine)))));
       end if;
 
       P.Step (Elapsed);
@@ -402,15 +509,25 @@ package body Player is
 
       --  Consume Fuel
       if Going_Right or else Going_Left or else Going_Up then
-         P.Fuel := P.Fuel - Fuel_Per_Step;
+         P.Fuel := P.Fuel - Parameters.Fuel_Per_Step;
       end if;
 
       Try_Drill;
 
-      --  FIXME soil market
-      if Integer (P.Position.Y) < 32 then
+      --  Market
+      if Integer (P.Position.Y) in 16 * 2 .. 16 * 3
+        and then
+         Integer (P.Position.X) in 16 * 15 .. 16 * 16
+      then
          P.Empty_Cargo;
-         P.Fuel := Float (P.Fuel_Max);
+      end if;
+
+      --  Fuel pump
+      if Integer (P.Position.Y) in 16 * 2 .. 16 * 3
+        and then
+         Integer (P.Position.X) in 16 * 5 .. 16 * 6
+      then
+         P.Refuel;
       end if;
    end Update_Motion;
 
@@ -437,18 +554,25 @@ package body Player is
    -- Draw --
    ----------
 
-   procedure Draw (FB : in out HAL.UInt16_Array) is
+   procedure Draw_Hud (FB : in out HAL.UInt16_Array) is
+      use Parameters;
+
    begin
       Hud.Draw (FB,
                 P.Money,
                 Natural (P.Fuel),
-                P.Fuel_Max,
+                Tank_Capacity (P.Equip_Level (Tank)),
                 P.Cargo_Sum,
-                P.Cargo_Max,
-                P.Hull,
-                P.Hull_Max,
-                (-Integer (P.Position.Y) / Cell_Size) + 2);
-   end Draw;
+                Cargo_Capacity (P.Equip_Level (Cargo)),
+                (-Integer (P.Position.Y) / World.Cell_Size) + 2,
+                P.Cash_In);
+
+      if P.Cash_In_TTL > 0 then
+         P.Cash_In_TTL := P.Cash_In_TTL - 1;
+      else
+         P.Cash_In := 0;
+      end if;
+   end Draw_Hud;
 
    -------------
    -- Move_Up --

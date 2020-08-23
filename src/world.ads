@@ -4,7 +4,7 @@
 package World is
 
    Ground_Width : constant := 30;
-   Ground_Depth : constant := 100;
+   Ground_Depth : constant := 600;
 
    type Cell_Kind is (Empty, Dirt, Rock, Coal, Iron, Gold, Diamond)
      with Size => 4;

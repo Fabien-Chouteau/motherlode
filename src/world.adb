@@ -3,6 +3,8 @@
 
 with HAL; use HAL;
 
+with PyGamer.Time;
+
 package body World is
 
    Seed : UInt32 := 5323;
@@ -138,7 +140,7 @@ package body World is
 
    procedure Generate_Ground is
    begin
-      Ground := (others => Dirt);
+      Seed := 5000 + UInt32 (PyGamer.Time.Clock mod 323);
 
       for X in 0 .. Ground_Width - 1 loop
          for Y in 0 .. Ground_Depth - 1 loop

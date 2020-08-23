@@ -1,17 +1,15 @@
 --  Motherlode
 --  Copyright (c) 2020 Fabien Chouteau
 
-with HAL;
+with Render;
 
 package HUD is
 
    procedure Draw
-     (FB : in out HAL.UInt16_Array;
+     (FB : in out Render.Frame_Buffer;
       Money,
       Fuel, Fuel_Max,
-      Cargo, Cargo_Max,
-      Hull, Hull_Max : Natural;
-      Depth : Integer);
+      Cargo, Cargo_Max : Natural;
+      Depth, Cash_In : Integer);
 
-   function RGB565 (R, G, B : HAL.UInt8) return HAL.UInt16;
 end HUD;
